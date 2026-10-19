@@ -449,6 +449,14 @@ class WithDynamicSerializerMixin(
                 continue
             setattr(field, attr, value)
 
+    def _keeps_deferred_fields_on_write(self):
+        field = self.parent
+        if isinstance(field, serializers.ListSerializer):
+            field = field.parent
+        if field is None:
+            return True
+        return bool(getattr(field, 'kwargs', {}).get('writable'))
+
     def get_fields(self):
         """Returns the serializer's field set.
 
@@ -479,7 +487,8 @@ class WithDynamicSerializerMixin(
                 elif include is False:
                     deferred.add(name)
 
-        if self.get_request_method() not in ("POST", "PUT", "PATCH"):
+        is_write = self.get_request_method() in ("POST", "PUT", "PATCH")
+        if not (is_write and self._keeps_deferred_fields_on_write()):
             for name in deferred:
                 serializer_fields.pop(name)
         # Set read_only flags based on read_only_fields meta list.
